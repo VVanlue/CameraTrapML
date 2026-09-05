@@ -55,17 +55,6 @@ This one trains a CNN, VGG16 and ResNet50, on a large camera trap dataset and re
 
 Our proposed system starts with ImageNet-pretrained MobileNetV2 and ResNet18 models. We will fine-tune each model on the ENA24 camera-trap dataset so its output classes match the wildlife labels. We will then create FP32, INT8, and INT4 versions of the fine-tuned models using PyTorch quantization or ONNX Runtime. Each version will run through our benchmarking harness across quantization levels, batch sizes, and image resolutions. We will compare memory use, latency, throughput, accuracy, and F1 score.
 
-```mermaid
-flowchart LR
-    A[ENA24 images] --> B[Preprocessing<br/>resolution: 128, 224, 384]
-    B --> C[Fine-tuned MobileNetV2<br/>or ResNet18]
-    C --> D[FP32 baseline]
-    C --> E[INT8 / INT4 quantization]
-    D --> F[Benchmarking harness]
-    E --> F
-    F --> G[Memory, latency,<br/>throughput, accuracy, F1]
-```
-
 | Reused | Our contribution | Out of scope |
 |---|---|---|
 | ImageNet-pretrained MobileNetV2 and ResNet18 from PyTorch and torchvision | The benchmarking harness itself | Quantization-aware training |
