@@ -1,0 +1,4 @@
+arch,quant_level,batch_size,resolution,peak_memory_mb,peak_memory_mb,latency_ms_per_image,latency_ms_per_image,throughput_images_per_sec,throughput_images_per_sec,accuracy,accuracy,f1_macro,f1_macro
+,,,,mean,std,mean,std,mean,std,mean,std,mean,std
+mobilenet_v2,fp32,1,224,3.0679039999999986,,147.5722373339037,,6.776342339632313,,0.9248719408081958,,0.8940953295068557,
+mobilenet_v2,int8,1,224,1.4295040000000085,,142.83558666706085,,7.001056412719652,,0.9089356858281161,,0.8651166703555202,
