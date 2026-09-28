@@ -1,0 +1,18 @@
+# Raw and converted dataset — thousands of images, way too large for git
+raw/
+data/
+ena24.zip
+ena24.json
+
+# Trained model weights
+checkpoints/*.pt
+
+# Python clutter
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# OS clutter
+.DS_Store
+Thumbs.db
