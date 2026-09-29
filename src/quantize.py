@@ -1,26 +1,34 @@
 """
 Quantization utilities.
 
-INT8: uses torchvision's *quantizable* MobileNetV2/ResNet18 architectures
-(torchvision.models.quantization.*), which already implement the
-fuse_model() step needed for PyTorch's post-training static quantization
-(Jacob et al. 2018 — the same scheme our proposal cites). This gives a
-real int8 model with genuine memory and latency changes.
+Supported levels: fp32, int8, int4, int3, int2, 1.58bit, 1bit
 
-INT4: mainstream frameworks (torch, ONNX Runtime) do not support int4
-execution for standard convolutional architectures the way they do for
-transformer/linear layers. Rather than skip INT4 entirely, this module
-implements a *simulated* INT4 quantization: weights are quantized to 4
-bits per channel and immediately dequantized back to float32, so you can
-still measure the ACCURACY impact of 4-bit weights. Because computation
-still happens in float32, this does NOT give you a real latency/memory
-number for INT4 — only a theoretical memory estimate (see
-theoretical_param_memory_bytes). Report this distinction explicitly in
-your write-up; it's exactly the "INT4 may not fully work" risk your
-proposal already planned for.
+INT8 is REAL: uses torchvision's quantizable MobileNetV2/ResNet18
+architectures (torchvision.models.quantization.*) with PyTorch's
+post-training static quantization (Jacob et al. 2018). Genuine int8
+tensors, genuine memory/latency differences.
+
+INT4, INT3, INT2, 1.58bit (ternary), and 1bit (binary) are SIMULATED.
+No mainstream framework (torch, ONNX Runtime) executes CNN convolutions
+at these precisions the way they do for transformers/LLMs. Weights are
+quantized to the target precision and immediately dequantized back to
+float32, so:
+  - Accuracy / F1 impact IS real and meaningful to report.
+  - Latency / throughput at these levels will look close to FP32,
+    because compute still happens in float32. This is expected, not a
+    bug — report it as a known limitation, not a finding that "INT2 is
+    as fast as FP32."
+  - Memory should be reported using theoretical_param_memory_bytes()
+    (an estimate of packed storage), not the measured process RSS,
+    since the in-memory tensors are still float32.
+
+1.58bit (ternary, weights in {-1, 0, +1}) and 1bit (binary, weights in
+{-1, +1}) follow the simplified schemes from Li et al. 2016 (Ternary
+Weight Networks) and Rastegari et al. 2016 (XNOR-Net / Binary Weight
+Networks) respectively — using per-channel mean absolute value as the
+scale rather than the papers' full optimization, which is a reasonable
+simplification for this project's scope.
 """
-
-from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -28,13 +36,28 @@ from torchvision.models.quantization import mobilenet_v2 as q_mobilenet_v2
 from torchvision.models.quantization import resnet18 as q_resnet18
 
 
+QUANT_LEVELS = ["fp32", "int8", "int4", "int3", "int2", "1.58bit", "1bit"]
+
+# Bit width used for the THEORETICAL memory estimate at each level.
+THEORETICAL_BITS = {
+    "fp32": 32,
+    "int8": 8,
+    "int4": 4,
+    "int3": 3,
+    "int2": 2,
+    "1.58bit": 1.58,  # log2(3), the information-theoretic width of a ternary value
+    "1bit": 1,
+}
+
+# Integer levels handled by the generic symmetric n-bit fake quantizer.
+_SIMULATED_INT_BITS = {"int4": 4, "int3": 3, "int2": 2}
+
+
 # ---------------------------------------------------------------------------
 # INT8 (real, static, via torchvision quantizable architectures)
 # ---------------------------------------------------------------------------
 
 def build_quantizable_model(arch: str, num_classes: int) -> nn.Module:
-    """Build the quantizable (fuse_model-capable) version of the architecture,
-    with an unpretrained head sized for our number of classes."""
     if arch == "mobilenet_v2":
         model = q_mobilenet_v2(weights=None, quantize=False)
         in_features = model.classifier[-1].in_features
@@ -49,10 +72,6 @@ def build_quantizable_model(arch: str, num_classes: int) -> nn.Module:
 
 
 def load_finetuned_into_quantizable(arch: str, num_classes: int, fp32_checkpoint: str) -> nn.Module:
-    """Load your fine-tuned FP32 weights into the quantizable architecture.
-    Layer names match the regular torchvision model, so this should load
-    cleanly; strict=False guards against minor key mismatches from the
-    added quant/dequant stubs (which have no parameters of their own)."""
     model = build_quantizable_model(arch, num_classes)
     state_dict = torch.load(fp32_checkpoint, map_location="cpu")
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
@@ -61,79 +80,132 @@ def load_finetuned_into_quantizable(arch: str, num_classes: int, fp32_checkpoint
     return model
 
 
-def quantize_int8_static(
-    model: nn.Module,
-    calibration_loader,
-    num_calibration_batches: int = 10,
-) -> nn.Module:
-    """
-    Post-training static INT8 quantization.
-
-    Args:
-        model: a quantizable model from build_quantizable_model / load_finetuned_into_quantizable
-        calibration_loader: DataLoader providing representative (image, label) batches
-        num_calibration_batches: how many batches to run for calibration
-    """
+def quantize_int8_static(model: nn.Module, calibration_loader, num_calibration_batches: int = 10) -> nn.Module:
     model.eval()
-    model.fuse_model()  # fuses conv+bn(+relu) — required before quantizing
-
-    model.qconfig = torch.quantization.get_default_qconfig("fbgemm")  # x86 CPU backend
+    model.fuse_model()
+    model.qconfig = torch.quantization.get_default_qconfig("fbgemm")
     torch.quantization.prepare(model, inplace=True)
-
     with torch.no_grad():
         for i, (images, _) in enumerate(calibration_loader):
             if i >= num_calibration_batches:
                 break
             model(images)
-
     torch.quantization.convert(model, inplace=True)
     return model
 
 
 # ---------------------------------------------------------------------------
-# INT4 (simulated — see module docstring for the important caveat)
+# Simulated low-bit quantization: INT4 / INT3 / INT2
 # ---------------------------------------------------------------------------
 
-def _quantize_dequantize_tensor_int4(weight: torch.Tensor) -> torch.Tensor:
-    """Symmetric per-output-channel fake quantization to 4 bits (range [-8, 7])."""
-    qmin, qmax = -8, 7
+def _quantize_dequantize_symmetric(weight: torch.Tensor, bits: int) -> torch.Tensor:
+    """Symmetric per-output-channel fake quantization to `bits` bits."""
+    qmax = 2 ** (bits - 1) - 1
+    qmin = -(2 ** (bits - 1))
     out_channels = weight.shape[0]
     flat = weight.view(out_channels, -1)
     max_abs = flat.abs().max(dim=1, keepdim=True).values.clamp(min=1e-8)
     scale = max_abs / qmax
-
     q = torch.clamp(torch.round(flat / scale), qmin, qmax)
-    dq = (q * scale).view_as(weight)
-    return dq
+    return (q * scale).view_as(weight)
 
 
-def fake_quantize_int4(model: nn.Module) -> nn.Module:
-    """Apply simulated 4-bit weight quantization to every Conv2d/Linear layer,
-    in place, and return the same model with dequantized (float32) weights."""
+def fake_quantize_n_bit(model: nn.Module, bits: int) -> nn.Module:
+    """Apply simulated symmetric n-bit weight quantization to every
+    Conv2d/Linear layer, in place."""
     with torch.no_grad():
         for module in model.modules():
             if isinstance(module, (nn.Conv2d, nn.Linear)):
-                module.weight.copy_(_quantize_dequantize_tensor_int4(module.weight))
+                module.weight.copy_(_quantize_dequantize_symmetric(module.weight, bits))
     return model
 
 
-def theoretical_param_memory_bytes(model: nn.Module, bits_per_param: int) -> float:
-    """Estimate parameter storage if every parameter were packed at
-    bits_per_param bits (e.g. 32 for fp32, 8 for int8, 4 for int4).
-    Use this for the INT4 memory bar since real packed int4 storage isn't
-    produced by fake_quantize_int4 (weights stay float32 in memory)."""
+# ---------------------------------------------------------------------------
+# Simulated 1.58-bit (ternary) and 1-bit (binary)
+# ---------------------------------------------------------------------------
+
+def _ternary_quantize_tensor(weight: torch.Tensor, threshold_ratio: float = 0.7) -> torch.Tensor:
+    """Per-output-channel ternary quantization: weights become {-scale, 0, +scale}.
+    Simplified version of Li et al. 2016 (Ternary Weight Networks): scale is
+    the mean absolute weight per channel, and values within threshold_ratio *
+    scale of zero are pruned to exactly zero."""
+    out_channels = weight.shape[0]
+    flat = weight.view(out_channels, -1)
+    scale = flat.abs().mean(dim=1, keepdim=True).clamp(min=1e-8)
+    threshold = threshold_ratio * scale
+    q = torch.zeros_like(flat)
+    q[flat > threshold] = 1.0
+    q[flat < -threshold] = -1.0
+    return (q * scale).view_as(weight)
+
+
+def _binary_quantize_tensor(weight: torch.Tensor) -> torch.Tensor:
+    """Per-output-channel binary quantization: weights become {-scale, +scale}.
+    Simplified version of Rastegari et al. 2016 (Binary Weight Networks):
+    scale is the mean absolute weight per channel, sign gives the +/-."""
+    out_channels = weight.shape[0]
+    flat = weight.view(out_channels, -1)
+    scale = flat.abs().mean(dim=1, keepdim=True).clamp(min=1e-8)
+    sign = torch.sign(flat)
+    sign[sign == 0] = 1.0  # torch.sign(0) == 0; map to +1 so no weight is exactly zero
+    return (sign * scale).view_as(weight)
+
+
+def fake_quantize_ternary(model: nn.Module) -> nn.Module:
+    with torch.no_grad():
+        for module in model.modules():
+            if isinstance(module, (nn.Conv2d, nn.Linear)):
+                module.weight.copy_(_ternary_quantize_tensor(module.weight))
+    return model
+
+
+def fake_quantize_binary(model: nn.Module) -> nn.Module:
+    with torch.no_grad():
+        for module in model.modules():
+            if isinstance(module, (nn.Conv2d, nn.Linear)):
+                module.weight.copy_(_binary_quantize_tensor(module.weight))
+    return model
+
+
+# ---------------------------------------------------------------------------
+# Memory estimate (used for every simulated level, and as a sanity check for int8)
+# ---------------------------------------------------------------------------
+
+def theoretical_param_memory_bytes(model: nn.Module, level: str) -> float:
+    """Estimate parameter storage if every parameter were packed at the
+    bit width associated with `level`. Use this for INT4/INT3/INT2/
+    1.58bit/1bit memory reporting, since fake quantization leaves
+    weights as float32 in actual memory."""
+    bits = THEORETICAL_BITS[level]
     n_params = sum(p.numel() for p in model.parameters())
-    return n_params * bits_per_param / 8
+    return n_params * bits / 8
+
+
+# ---------------------------------------------------------------------------
+# Single dispatch point used by run_sweep.py
+# ---------------------------------------------------------------------------
+
+def apply_quantization(model: nn.Module, level: str) -> nn.Module:
+    """Apply simulated quantization for any non-fp32, non-int8 level.
+    (fp32 needs no change; int8 goes through quantize_int8_static, which
+    needs a calibration_loader and is called separately.)"""
+    if level in _SIMULATED_INT_BITS:
+        return fake_quantize_n_bit(model, _SIMULATED_INT_BITS[level])
+    if level == "1.58bit":
+        return fake_quantize_ternary(model)
+    if level == "1bit":
+        return fake_quantize_binary(model)
+    raise ValueError(f"apply_quantization does not handle level={level!r} "
+                      f"(fp32 needs no call; int8 uses quantize_int8_static)")
 
 
 if __name__ == "__main__":
     # Smoke test with random weights (no dataset needed).
-    m = build_quantizable_model("mobilenet_v2", num_classes=23)
     dummy = torch.randn(1, 3, 224, 224)
-    with torch.no_grad():
-        out_before = m(dummy)
-    fake_quantize_int4(m)
-    with torch.no_grad():
-        out_after = m(dummy)
-    print("INT4 simulation ran OK. Output shapes:", out_before.shape, out_after.shape)
-    print("Theoretical INT4 memory (MB):", theoretical_param_memory_bytes(m, 4) / 1e6)
+    for level in ["int4", "int3", "int2", "1.58bit", "1bit"]:
+        m = build_quantizable_model("mobilenet_v2", num_classes=22)
+        apply_quantization(m, level)
+        with torch.no_grad():
+            out = m(dummy)
+        mem_mb = theoretical_param_memory_bytes(m, level) / 1e6
+        print(f"{level}: output shape {tuple(out.shape)}, theoretical memory {mem_mb:.2f} MB")
