@@ -16,3 +16,11 @@ venv/
 # OS clutter
 .DS_Store
 Thumbs.db
+
+models/
+models_pi/
+results/
+figures/
+predictions/
+smoke_test_tmp/
+.gradio/

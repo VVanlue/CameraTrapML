@@ -81,15 +81,22 @@ def load_finetuned_into_quantizable(arch: str, num_classes: int, fp32_checkpoint
 
 
 def quantize_int8_static(model: nn.Module, calibration_loader, num_calibration_batches: int = 10) -> nn.Module:
+    # set model to evaluation mode
     model.eval()
+    # fuses layers of nn into one single operation (reduces memory acccess overhead/improves inference speed)
     model.fuse_model()
+    # specifies quantization configuration (fbgemm is optimized for CPU deployment)
     model.qconfig = torch.quantization.get_default_qconfig("fbgemm")
+    # inserts "observer" modules into network to track min and max ranges of weights/activations during calibration
+    # prepares model for static quantizatiom
     torch.quantization.prepare(model, inplace=True)
+    # runs calibration loop: feeds data into model while observers learn
     with torch.no_grad():
         for i, (images, _) in enumerate(calibration_loader):
             if i >= num_calibration_batches:
                 break
             model(images)
+    # converts model into quantized version: removes observers,replaces standard FP32 operations/weights with INT8 counterparts based on calibration data collected
     torch.quantization.convert(model, inplace=True)
     return model
 
