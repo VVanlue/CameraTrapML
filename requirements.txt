@@ -1,11 +1,14 @@
+# Core (tested with torch 2.x eager-mode quantization; see README if torch.ao.quantization warns)
 torch>=2.1
 torchvision>=0.16
-onnx>=1.15
-onnxruntime>=1.16
-scikit-learn>=1.3
-pandas>=2.1
-matplotlib>=3.8
-psutil>=5.9
-pillow>=10.0
-pyyaml>=6.0
-tqdm>=4.66
+numpy
+pandas
+scikit-learn
+matplotlib
+psutil
+tqdm
+pillow
+# Web UI
+gradio>=4.0
+# Recommended detector (MegaDetector). Optional: the app falls back to our own detector.
+# PytorchWildlife
