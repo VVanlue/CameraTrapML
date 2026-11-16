@@ -58,10 +58,10 @@ def main():
     run(src / "train_baseline.py", "--arch", "mobilenet_v2", "--data_dir", data, "--resolution", res,
         "--epochs", 2, "--batch_size", 16, "--workers", 0, "--no_pretrained")
     levels = ["int8", "int4", "int2", "1.58bit", "1bit"]
-    run(src / "qat_train.py", "--arch", "mobilenet_v2", "--resolution", res, "--method", "ptq",
+    run(src / "train_quantized.py", "--arch", "mobilenet_v2", "--resolution", res, "--method", "ptq",
         "--fp32_checkpoint", f"models/mobilenet_v2_fp32_res{res}.pt", "--levels", *levels, "--workers", 0,
         "--calib_batches", 4)
-    run(src / "qat_train.py", "--arch", "mobilenet_v2", "--resolution", res, "--method", "qat", "--epochs", 1,
+    run(src / "train_quantized.py", "--arch", "mobilenet_v2", "--resolution", res, "--method", "qat", "--epochs", 1,
         "--fp32_checkpoint", f"models/mobilenet_v2_fp32_res{res}.pt", "--levels", *levels, "--workers", 0,
         "--calib_batches", 4, "--batch_size", 16)
     run(src / "run_sweep.py", "--arch", "mobilenet_v2", "--resolutions", res, "--batch_sizes", 1, 8,
@@ -70,7 +70,7 @@ def main():
     run(src / "plot_results.py", "--arch", "mobilenet_v2", "--resolution", res)
     sample = next((data / "Bobcat").glob("*.jpg"))
     run(src / "predict.py", "--images", sample, "--detector", "none", "--model", f"mobilenet_v2 int4 QAT @{res}")
-    print("\nSMOKE TEST PASSED — see smoke_test_tmp/figures and smoke_test_tmp/predictions")
+    print("\nSMOKE TEST PASSED — see smoke_test_tmp/data/figures and smoke_test_tmp/data/predictions")
 
 
 if __name__ == "__main__":

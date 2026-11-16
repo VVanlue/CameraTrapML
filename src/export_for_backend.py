@@ -7,7 +7,7 @@ do run on ARM, but their activation rounding differs slightly.
     python src/export_for_backend.py --arch mobilenet_v2 --resolution 224 --backend qnnpack \
         --out_dir models_pi
 
-Reads   models/<arch>_<level>_<method>_res<R>.latent.pt   (saved by qat_train.py)
+Reads   models/<arch>_<level>_<method>_res<R>.latent.pt   (saved by train_quantized.py)
 Writes  <out_dir>/ the same file names (.pt, .ts, .qpk, .json) + fp32 files + meta,
         so you can copy <out_dir> to the Pi and point --models_dir at it.
 """

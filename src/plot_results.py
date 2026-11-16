@@ -1,12 +1,17 @@
 """
-Generates the four figures planned in Section 7 of the proposal:
-  1. Bar chart of peak memory by quantization level
-  2. Line plots of latency and throughput vs batch size
-  3. Accuracy comparison table across quantization levels and resolutions (CSV, printable)
-  4. Scatter plot of throughput vs accuracy
+Turn the sweep summaries (<results_dir>/<arch>_<tag>_summary.csv and
+<results_dir>/accuracy/) into the report figures and tables:
 
-Usage:
-    python src/plot_results.py --raw_csv results/mobilenet_v2_raw_results.csv --out_dir figures
+  01 accuracy / F1 vs bit-width (QAT vs PTQ)    07 accuracy vs model size
+  02 storage by level                           08 per-species F1 heatmap
+  03 peak-RAM breakdown                         09 confusion matrices
+  04 latency vs batch size                      10 peak RAM vs batch size
+  05 throughput vs batch size                   11 resolution effect (if >1 res)
+  06 accuracy vs latency                        12 device comparison (if >1 tag)
+  summary_table.csv / summary_table.md
+
+Usage (or simply `python result.py` from the repo root):
+    python src/plot_results.py --arch mobilenet_v2 --results_dir data/results --out_dir data/figures
 """
 
 import argparse
@@ -309,8 +314,8 @@ def write_tables(s, out, res):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--arch", default="mobilenet_v2")
-    p.add_argument("--results_dir", default="results")
-    p.add_argument("--out_dir", default="figures")
+    p.add_argument("--results_dir", default="data/results")
+    p.add_argument("--out_dir", default="data/figures")
     p.add_argument("--tag", default=None, help="device tag for single-device figures (default: first found)")
     p.add_argument("--resolution", type=int, default=None, help="main resolution (default: 224 if present)")
     a = p.parse_args()

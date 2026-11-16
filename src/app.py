@@ -71,7 +71,7 @@ def build_app(models_dir, detector_kind, backend):
                 status = gr.Markdown()
                 table = gr.Dataframe(headers=["#", "species", "confidence", "detector score", "runner-ups"],
                                      label="Detections", wrap=True)
-        ex_dir = Path("examples")
+        ex_dir = Path(__file__).resolve().parent.parent / "examples"
         if ex_dir.exists():
             exs = [[str(p)] for p in sorted(ex_dir.glob("*.jp*g"))[:8]]
             if exs:

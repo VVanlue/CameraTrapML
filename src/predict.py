@@ -3,9 +3,10 @@ Headless version of the app, for batches of photos and for constrained
 hardware (Raspberry Pi, a 1-CPU Docker container, ...). No browser needed.
 
     python src/predict.py --images path/to/folder --model "mobilenet_v2 int8 QAT @224" \
-        --out_dir predictions --threads 1
+        --threads 1
 
-Writes predictions/<name>_boxed.jpg (green boxes) and predictions/predictions.csv,
+Writes <out_dir>/<name>_boxed.jpg (green boxes) and <out_dir>/predictions.csv
+(default out_dir: data/predictions),
 and prints end-to-end timing (detector + classifier) per image and a summary,
 which is the number a field deployment actually cares about.
 """
@@ -37,7 +38,7 @@ def main():
     p.add_argument("--conf", type=float, default=0.25)
     p.add_argument("--threads", type=int, default=0, help="0 = all cores; 1 emulates a single-core board")
     p.add_argument("--backend", default=None)
-    p.add_argument("--out_dir", default="predictions")
+    p.add_argument("--out_dir", default="data/predictions")
     a = p.parse_args()
 
     if a.threads:

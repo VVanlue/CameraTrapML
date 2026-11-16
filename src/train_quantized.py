@@ -1,7 +1,7 @@
 """
 Produce a REAL quantized model for each level, by PTQ or QAT.
 
-    python src/qat_train.py --arch mobilenet_v2 --resolution 224 \
+    python src/train_quantized.py --arch mobilenet_v2 --resolution 224 \
         --fp32_checkpoint models/mobilenet_v2_fp32_res224.pt \
         --levels int8 int4 int3 int2 1.58bit 1bit --method qat --device cuda
 

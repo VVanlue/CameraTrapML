@@ -1,23 +1,25 @@
 """
-Runs the experimental sweep across quantization level x batch size x
-resolution, for all 7 levels: fp32, int8, int4, int3, int2, 1.58bit, 1bit.
+Run the full experiment: every quantization level x method (QAT / PTQ) x
+batch size x resolution, for one architecture.
 
-Only fp32 and int8 give you real, physically-measured memory/latency
-differences. int4/int3/int2/1.58bit/1bit report REAL accuracy/F1 but
-SIMULATED memory (theoretical, not measured) and near-FP32 latency,
-because no mainstream framework executes CNNs below int8 — see
-quantize.py's module docstring. The results CSV includes a
-peak_memory_is_theoretical column so you can distinguish real from
-theoretical rows when you plot and discuss this.
+For each model found in --models_dir it:
+  1. measures test accuracy / macro-F1 (with bootstrap 95% CIs and per-class
+     F1) -> <out_dir>/accuracy/
+  2. benchmarks latency, throughput and memory in fresh processes
+     (benchmark.py), --repeats times per config
+and writes
+  <out_dir>/<arch>_<tag>_raw.csv       one row per repeat
+  <out_dir>/<arch>_<tag>_summary.csv   mean / std / 95% CI per config
 
-Start small for a progress demo:
+Prerequisites: train_baseline.py (fp32 + meta) and train_quantized.py (int8...1bit).
 
-    python src/run_sweep.py --arch mobilenet_v2 \
-        --checkpoint checkpoints/mobilenet_v2_fp32_res224.pt \
-        --quant_levels fp32 int8 int4 1bit \
-        --batch_sizes 1 --resolutions 224 --trials 1
+    python src/run_sweep.py --arch mobilenet_v2 --methods qat ptq \
+        --batch_sizes 1 4 8 16 --resolutions 224 --repeats 3
 
-then widen once you know it runs end to end.
+Quick check first:
+
+    python src/run_sweep.py --arch mobilenet_v2 --levels fp32 int8 \
+        --batch_sizes 1 --repeats 1
 """
 
 import argparse
@@ -120,10 +122,10 @@ def main():
     p.add_argument("--backend", default=None)
     p.add_argument("--eager", action="store_true", help="benchmark eager models instead of TorchScript")
     p.add_argument("--skip_accuracy", action="store_true",
-                   help="reuse accuracy JSONs already in results/accuracy (e.g. on a slow Pi)")
+                   help="reuse accuracy JSONs already in <out_dir>/accuracy (e.g. on a slow Pi)")
     p.add_argument("--tag", default="laptop", help="device label, e.g. laptop, pi4, docker_1cpu")
     p.add_argument("--data_dir", default=None)
-    p.add_argument("--out_dir", default="results")
+    p.add_argument("--out_dir", default="data/results")
     args = p.parse_args()
 
     backend = set_backend(args.backend)

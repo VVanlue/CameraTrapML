@@ -3,8 +3,11 @@ Fine-tune an ImageNet-pretrained MobileNetV2 or ResNet18 on ENA24 and
 save the resulting FP32 checkpoint. This is the baseline every
 quantized version gets compared against.
 
+Writes models/<arch>_fp32_res<R>.pt, models/<arch>_res<R>_meta.json and
+models/classes.txt.
+
 Usage:
-    python src/train_baseline.py --arch mobilenet_v2 --data_dir data/ena24 --epochs 5
+    python src/train_baseline.py --arch mobilenet_v2 --data_dir data/ena24_crops --epochs 8
 """
 
 import argparse

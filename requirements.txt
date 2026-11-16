@@ -1,4 +1,4 @@
-# Core (tested with torch 2.x eager-mode quantization; see README if torch.ao.quantization warns)
+# pip alternative to `uv sync` (pyproject.toml + uv.lock are the source of truth)
 torch>=2.1
 torchvision>=0.16
 numpy
@@ -8,7 +8,7 @@ matplotlib
 psutil
 tqdm
 pillow
-# Web UI
+# Web demo (src/app.py)
 gradio>=4.0
-# Recommended detector (MegaDetector). Optional: the app falls back to our own detector.
+# Optional, recommended detector for the demo (MegaDetector):
 # PytorchWildlife

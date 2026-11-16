@@ -1,38 +1,44 @@
 """
-Quantization utilities.
+Quantization utilities: build, convert, save and load a classifier at any
+precision level.
 
-Supported levels: fp32, int8, int4, int3, int2, 1.58bit, 1bit
+Levels: fp32, fp16, int8, int4, int3, int2, 1.58bit (ternary), 1bit (binary)
 
-INT8 is REAL: uses torchvision's quantizable MobileNetV2/ResNet18
-architectures (torchvision.models.quantization.*) with PyTorch's
-post-training static quantization (Jacob et al. 2018). Genuine int8
-tensors, genuine memory/latency differences.
+How each level is produced
+--------------------------
+* fp32 / fp16  The fine-tuned float checkpoint (fp16 = weights cast to half).
+* int8 ... 1bit  BatchNorm is folded into the convs, then every conv/linear
+  weight gets a per-output-channel symmetric quantizer
+  (LowBitWeightFakeQuant) and activations get 8-bit fake quant
+  (Jacob et al. 2018). The model is either calibrated (PTQ) or fine-tuned
+  with the straight-through estimator (QAT, see train_quantized.py), then
+  converted with torch.ao.quantization.convert() into a true integer model.
+  - int2..int4 use MSE-optimal clipping of the per-channel scale.
+  - 1.58bit follows Ternary Weight Networks (Li et al. 2016) and 1bit follows
+    Binary Weight Networks / XNOR-Net (Rastegari et al. 2016), using the
+    per-channel mean |w| as the scale.
+  - By default the first conv, the classifier and MobileNetV2's depthwise
+    convs stay at 8 bits (standard practice; they are ~3% of the weights).
 
-INT4, INT3, INT2, 1.58bit (ternary), and 1bit (binary) are SIMULATED.
-No mainstream framework (torch, ONNX Runtime) executes CNN convolutions
-at these precisions the way they do for transformers/LLMs. Weights are
-quantized to the target precision and immediately dequantized back to
-float32, so:
-  - Accuracy / F1 impact IS real and meaningful to report.
-  - Latency / throughput at these levels will look close to FP32,
-    because compute still happens in float32. This is expected, not a
-    bug — report it as a known limitation, not a finding that "INT2 is
-    as fast as FP32."
-  - Memory should be reported using theoretical_param_memory_bytes()
-    (an estimate of packed storage), not the measured process RSS,
-    since the in-memory tensors are still float32.
-
-1.58bit (ternary, weights in {-1, 0, +1}) and 1bit (binary, weights in
-{-1, +1}) follow the simplified schemes from Li et al. 2016 (Ternary
-Weight Networks) and Rastegari et al. 2016 (XNOR-Net / Binary Weight
-Networks) respectively — using per-channel mean absolute value as the
-scale rather than the papers' full optimization, which is a reasonable
-simplification for this project's scope.
+What is real and what is not
+----------------------------
+* Accuracy / F1 are measured on the converted integer model.
+* Storage is real: export_packed() writes a .qpk file with the integer codes
+  bit-packed at n bits/weight (base-3 packing for ternary), and
+  load_packed() rebuilds an identical model from that file alone.
+* Runtime: PyTorch only has int8 CPU kernels, so int4 ... 1bit models
+  execute on the int8 kernels with their codes restricted to the n-bit grid.
+  Latency / RAM below int8 therefore look like int8, not smaller. Report that
+  as a limitation of the software stack, not as a property of the model.
 """
 
+import json
+import os
 import pickle
 import platform
+import tempfile
 import warnings
+from pathlib import Path
 from typing import Dict, Optional
 
 import numpy as np
@@ -279,8 +285,6 @@ def build_empty_quantized(arch: str, num_classes: int, level: str, backend: str,
 
 def _layer_flags(path) -> dict:
     """Read first_last_8bit / depthwise_8bit from the report JSON saved next to a model."""
-    from pathlib import Path
-    import json
     j = Path(path).with_suffix(".json")
     if j.exists():
         r = json.loads(j.read_text())
@@ -427,7 +431,6 @@ def fp_file_bytes(model: nn.Module, level: str, path: str) -> int:
     """Save an fp32/fp16 state_dict and return its size on disk."""
     sd = {k: (v.half() if level == "fp16" and v.is_floating_point() else v) for k, v in model.state_dict().items()}
     torch.save(sd, path)
-    import os
     return os.path.getsize(path)
 
 
@@ -451,11 +454,13 @@ if __name__ == "__main__":
         q, info = bake_and_convert(m)
         with torch.no_grad():
             out = q(x)
-        stats = export_packed(q, info, f"/tmp/_smoke_{level}.qpk")
+        qpk = os.path.join(tempfile.gettempdir(), f"_smoke_{level}.qpk")
+        stats = export_packed(q, info, qpk)
         codes = count_unique_weight_codes(q)
-        q2 = load_packed("mobilenet_v2", 22, level, f"/tmp/_smoke_{level}.qpk", backend)
+        q2 = load_packed("mobilenet_v2", 22, level, qpk, backend)
         with torch.no_grad():
             same = torch.equal(q2(x), out)
+        # only layers actually at the target level (first/last/depthwise are kept 8-bit)
+        at_level = [c for n, c in codes.items() if info.get(n, {}).get("level") == level]
         print(f"{level:8s} reload-from-packed identical={same} | out {tuple(out.shape)} | packed {stats['packed_file_bytes']/1e6:.2f} MB "
-              f"| avg bits {stats['avg_weight_bits']:.2f} | max unique codes/layer (excl. first/last) "
-              f"{max(list(codes.values())[1:-1])}")
+              f"| avg bits {stats['avg_weight_bits']:.2f} | max unique codes/layer at {level}: {max(at_level or [0])}")

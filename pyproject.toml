@@ -1,0 +1,27 @@
+[project]
+name = "cameratrapml"
+version = "1.0.0"
+description = "Quantization in wildlife camera traps: memory, latency and accuracy trade-offs of FP32 -> 1-bit MobileNetV2/ResNet18 classifiers on ENA24"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Ben Bush" }, { name = "Victoria Vanlue" }]
+dependencies = [
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "matplotlib",
+    "psutil",
+    "tqdm",
+    "pillow",
+    "gradio>=4.0",
+]
+
+[project.optional-dependencies]
+# MegaDetector for the demo's detection stage (optional; the app falls back without it)
+megadetector = ["PytorchWildlife"]
+
+[tool.uv]
+# This repo is a collection of scripts (run.py, result.py, src/), not an installable package.
+package = false

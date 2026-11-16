@@ -1,12 +1,13 @@
 """
-Benchmarking harness. For a given model + dataloader, measures:
-  - peak memory (MB, process RSS delta during inference)
-  - per-image latency (ms)
-  - throughput (images/sec)
-  - accuracy and macro F1
+Benchmarking harness for one saved model in a fresh, isolated process.
+Measures:
+  - model load memory and peak inference memory (private data MB, sampled every 1 ms)
+  - per-image latency (ms) and batch latency percentiles
+  - throughput (images/sec), with adaptive trials until the SEM is < 2%
 
-Run standalone for a single config, or import run_benchmark() from
-run_sweep.py to sweep quantization level x batch size x resolution.
+Accuracy / F1 are measured separately in run_sweep.py. run_sweep.py calls
+run_in_fresh_process() for every level x batch size x resolution; this file
+can also be run standalone for a single config (see the __main__ block).
 """
 
 import gc
@@ -184,7 +185,7 @@ if __name__ == "__main__":
     # Standalone: benchmark one saved model.
     #   python src/benchmark.py --arch mobilenet_v2 --level int8 \
     #       --model_path models/mobilenet_v2_int8_qat_res224.pt --num_classes 22 \
-    #       --timing_tensor results/cache/timing_res224.pt --batch_size 1
+    #       --timing_tensor data/results/cache/timing_res224_n96.pt --batch_size 1
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch", required=True)

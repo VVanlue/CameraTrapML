@@ -1,8 +1,10 @@
-# Emulates a small field device on your laptop: run with CPU and RAM caps, e.g.
+# Emulates a small field device on your laptop: run the sweep with CPU and RAM caps.
+# Run from the repo root after `python run.py all ...` has produced models/ and data/results/accuracy/:
 #   docker build -f Dockerfile.constrained -t cameratrap-edge .
-#   docker run --rm --cpus=1 --memory=1g -v %cd%/models:/app/models -v %cd%/results:/app/results cameratrap-edge
-# (on Mac/Linux use $(pwd) instead of %cd%)
-FROM python:3.11-slim
+#   docker run --rm --cpus=1 --memory=1g \
+#       -v "$(pwd)/models:/app/models" -v "$(pwd)/data/results:/app/data/results" cameratrap-edge
+# (Windows cmd: use %cd% instead of $(pwd))
+FROM python:3.12-slim
 WORKDIR /app
 RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir numpy pandas scikit-learn matplotlib psutil tqdm pillow

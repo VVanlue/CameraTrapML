@@ -1,0 +1,31 @@
+{
+  "arch": "mobilenet_v2",
+  "resolution": 224,
+  "classes": [
+    "American_Black_Bear",
+    "American_Crow",
+    "Bird",
+    "Bobcat",
+    "Chicken",
+    "Coyote",
+    "Dog",
+    "Domestic_Cat",
+    "Eastern_Chipmunk",
+    "Eastern_Cottontail",
+    "Eastern_Fox_Squirrel",
+    "Eastern_Gray_Squirrel",
+    "Grey_Fox",
+    "Horse",
+    "Northern_Raccoon",
+    "Red_Fox",
+    "Striped_Skunk",
+    "Vehicle",
+    "Virginia_Opossum",
+    "White_Tailed_Deer",
+    "Wild_Turkey",
+    "Woodchuck"
+  ],
+  "data_dir": "data/ena24",
+  "seed": 0,
+  "notes": "Shipped baseline (commit ab0c0fa, 10 epochs). Trained by an earlier version of train_baseline.py on whole frames (data/ena24, i.e. prepare_ena24.py --mode full). Preliminary sweep: test accuracy 0.987, macro-F1 0.983 (data/results/preliminary). Re-run train_baseline.py on data/ena24_crops to get a crop-trained baseline that matches the detector->classifier pipeline."
+}

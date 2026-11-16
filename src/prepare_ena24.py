@@ -12,13 +12,12 @@ Outputs (pick with --mode):
             margin. THIS is what the classifier should be trained on, because
             the app runs "detector finds the animal -> classifier names the crop".
     full    data/ena24/<Class_Name>/<imageid>.jpg
-            Whole frames, labelled with the (first) box's class. This is the
-            layout your original runs used.
+            Whole frames, labelled with the (first) box's class. The shipped
+            baseline in models/ was trained on this layout.
     both    both of the above.
 
 It also writes data/ena24_boxes.json: a cleaned list of {file, width, height,
-boxes:[[x1,y1,x2,y2,class_name], ...]} used by train_detector.py and by
-evaluate_pipeline.py.
+boxes:[[x1,y1,x2,y2,class_name], ...]} used by train_detector.py.
 
 Usage:
     python src/prepare_ena24.py --images_dir data/raw/images \
