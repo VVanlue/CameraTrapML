@@ -7,8 +7,7 @@ Local web app: drop in a camera-trap photo, get green boxes + species names.
 
 Everything runs on your machine; nothing is uploaded anywhere (unless --share).
 The model dropdown lists every classifier you have trained (fp32, fp16, int8,
-int4 ... 1bit), so during the talk you can run the SAME photo through fp32 and
-1-bit and show the audience the difference live.
+int4 ... 1bit), so the same photo can be compared across precisions.
 """
 
 import argparse

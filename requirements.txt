@@ -11,4 +11,4 @@ pillow
 # Web demo (src/app.py)
 gradio>=4.0
 # Optional, recommended detector for the demo (MegaDetector):
-# PytorchWildlife
+# PytorchWildlife soundfile librosa "setuptools<81"

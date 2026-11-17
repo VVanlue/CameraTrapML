@@ -1,0 +1,39 @@
+{
+  "accuracy": 0.7979661016949152,
+  "f1_macro": 0.7567524300930489,
+  "accuracy_std": 0.010633405671444747,
+  "f1_macro_std": 0.013375878346954044,
+  "accuracy_ci95": [
+    0.7776101694915254,
+    0.8176440677966101
+  ],
+  "f1_macro_ci95": [
+    0.7291769699663743,
+    0.7809898739089344
+  ],
+  "per_class_f1": {
+    "American_Black_Bear": 0.8775510204081632,
+    "American_Crow": 0.9118279569892473,
+    "Bird": 0.6341463414634146,
+    "Bobcat": 0.5892857142857143,
+    "Chicken": 0.8767123287671232,
+    "Coyote": 0.9113924050632911,
+    "Dog": 0.8,
+    "Domestic_Cat": 0.6056338028169014,
+    "Eastern_Chipmunk": 0.898876404494382,
+    "Eastern_Cottontail": 0.7884615384615384,
+    "Eastern_Fox_Squirrel": 0.8297872340425532,
+    "Eastern_Gray_Squirrel": 0.7640449438202247,
+    "Grey_Fox": 0.6456692913385826,
+    "Horse": 0.75,
+    "Northern_Raccoon": 0.7032967032967034,
+    "Red_Fox": 0.5565217391304348,
+    "Striped_Skunk": 0.8,
+    "Vehicle": 0.75,
+    "Virginia_Opossum": 0.9047619047619048,
+    "White_Tailed_Deer": 0.746268656716418,
+    "Wild_Turkey": 0.828125,
+    "Woodchuck": 0.47619047619047616
+  },
+  "n_test": 1475
+}

@@ -72,6 +72,6 @@ if __name__ == "__main__":
     for arch in SUPPORTED_MODELS:
         m = build_model(arch, num_classes=22, pretrained=False)
         q = build_quantizable(arch, num_classes=22)
-        q.load_state_dict(m.state_dict())  # proves FP32 checkpoints load into the quantizable model
+        q.load_state_dict(m.state_dict())  # FP32 checkpoints must load into the quantizable model
         out = m(torch.randn(1, 3, 224, 224))
         print(f"{arch}: output {tuple(out.shape)}, params {sum(p.numel() for p in m.parameters())/1e6:.2f}M — OK")

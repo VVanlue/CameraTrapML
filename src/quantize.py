@@ -93,7 +93,7 @@ def _int_range(bits):
 
 def _best_int_scale(w2d: torch.Tensor, bits: int) -> torch.Tensor:
     """Per-channel scale choosing the clipping ratio that minimises MSE.
-    Max-abs scaling (what the old code did) wastes most of a 2-3 bit grid on
+    Plain max-abs scaling wastes most of a 2-3 bit grid on
     rare outliers; MSE clipping is the standard fix."""
     qmin, qmax = _int_range(bits)
     max_abs = w2d.abs().amax(dim=1, keepdim=True).clamp(min=1e-8)
@@ -435,7 +435,7 @@ def fp_file_bytes(model: nn.Module, level: str, path: str) -> int:
 
 
 def count_unique_weight_codes(qmodel) -> Dict[str, int]:
-    """Sanity check for the talk: how many distinct integer values each layer
+    """Sanity check: how many distinct integer values each layer
     actually uses (int4 <= 16, ternary <= 3, binary == 2)."""
     return {name: int(torch.unique(w.int_repr()).numel()) for name, _, w in _quantized_weight_modules(qmodel)}
 

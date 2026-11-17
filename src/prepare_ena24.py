@@ -35,7 +35,7 @@ from tqdm import tqdm
 
 
 def clean_name(name: str) -> str:
-    """'Eastern Gray Squirrel' -> 'Eastern_Gray_Squirrel' (matches your class list)."""
+    """'Eastern Gray Squirrel' -> 'Eastern_Gray_Squirrel' (folder-safe class name)."""
     name = re.sub(r"[^A-Za-z0-9]+", "_", name.strip())
     return name.strip("_")
 

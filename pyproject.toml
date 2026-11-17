@@ -20,7 +20,17 @@ dependencies = [
 
 [project.optional-dependencies]
 # MegaDetector for the demo's detection stage (optional; the app falls back without it)
-megadetector = ["PytorchWildlife"]
+megadetector = [
+    "PytorchWildlife",
+    # imported by PytorchWildlife 1.3 but not declared as its dependencies:
+    "soundfile",
+    "librosa",
+    "setuptools<81",   # bundled yolov5 still imports pkg_resources (removed in setuptools 81)
+]
+# rebuild the slides (scripts/make_slides.py)
+docs = ["python-pptx", "qrcode[pil]"]
+# run notebooks/results_walkthrough.ipynb locally
+notebook = ["jupyterlab", "ipykernel"]
 
 [tool.uv]
 # This repo is a collection of scripts (run.py, result.py, src/), not an installable package.

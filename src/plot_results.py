@@ -6,8 +6,8 @@ Turn the sweep summaries (<results_dir>/<arch>_<tag>_summary.csv and
   02 storage by level                           08 per-species F1 heatmap
   03 peak-RAM breakdown                         09 confusion matrices
   04 latency vs batch size                      10 peak RAM vs batch size
-  05 throughput vs batch size                   11 resolution effect (if >1 res)
-  06 accuracy vs latency                        12 device comparison (if >1 tag)
+  05 throughput vs batch size                   11 device comparison (if >1 tag)
+  06 accuracy vs latency                        12 resolution effect (if >1 res)
   summary_table.csv / summary_table.md
 
 Usage (or simply `python result.py` from the repo root):
@@ -256,7 +256,7 @@ def fig_resolution(s, out):
     for ax in axes:
         ax.set_xlabel("Input size (px, square)")
     axes[1].legend(fontsize=9)
-    save(fig, out, "11_resolution_effect.png")
+    save(fig, out, "12_resolution_effect.png")
 
 
 def fig_devices(s_all, out, res):
@@ -268,18 +268,26 @@ def fig_devices(s_all, out, res):
     levels = [lv for lv in LEVEL_ORDER if lv in set(d.level)]
     fig, ax = plt.subplots(figsize=(10, 4.6))
     w = 0.8 / len(tags)
+    vals = d.latency_ms_per_image_mean.dropna()
+    logy = len(vals) and vals.max() / max(vals.min(), 1e-9) > 15   # e.g. slow fp16 would hide the int bars
     for i, t in enumerate(tags):
         x = d[d.tag == t].set_index("level").reindex(levels)
-        ax.bar(np.arange(len(levels)) + i * w, x.latency_ms_per_image_mean, width=w,
-               yerr=x.latency_ms_per_image_std.fillna(0), color=SERIES[i], label=t,
-               edgecolor=SURFACE, linewidth=2, capsize=3)
+        bars = ax.bar(np.arange(len(levels)) + i * w, x.latency_ms_per_image_mean, width=w,
+                      yerr=x.latency_ms_per_image_std.fillna(0), color=SERIES[i], label=t,
+                      edgecolor=SURFACE, linewidth=1, capsize=3)
+        for b, v in zip(bars, x.latency_ms_per_image_mean):
+            if np.isfinite(v):
+                ax.text(b.get_x() + b.get_width() / 2, v * (1.08 if logy else 1.0) + (0 if logy else 1),
+                        f"{v:.0f}" if v >= 10 else f"{v:.1f}", ha="center", va="bottom", fontsize=7.5, color=INK2)
     ax.set_xticks(np.arange(len(levels)) + w * (len(tags) - 1) / 2)
     ax.set_xticklabels(levels)
-    ax.set_ylabel("ms per image")
+    ax.set_ylabel("ms per image" + (" (log scale)" if logy else ""))
+    if logy:
+        ax.set_yscale("log")
     ax.set_title(f"Latency by device (batch {bs0}, {res}px)")
     ax.legend()
     ax.grid(axis="x", visible=False)
-    save(fig, out, "12_device_comparison.png")
+    save(fig, out, "11_device_comparison.png", "Mean ± std across fresh-process repeats; labels = ms per image.")
 
 
 def write_tables(s, out, res):

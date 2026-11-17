@@ -7,7 +7,7 @@ The end-user pipeline: photo in -> green boxes + species names out.
 
 This two-stage design is the standard in camera-trap ML (it is how MegaDetector
 + species classifiers are used in practice), and it keeps the quantization
-study clean: the thing we quantize is exactly the classifier.
+study clean: only the classifier is quantized.
 
 Detector backends (pick with detector=...):
     "megadetector"  Microsoft/AI for Good MegaDetector via `pip install PytorchWildlife`.

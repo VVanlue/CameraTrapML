@@ -10,8 +10,8 @@ For each level this writes to models/:
     <arch>_<level>_<method>_res<R>.qpk    bit-packed n-bit deployment file (size = real storage)
     <arch>_<level>_<method>_res<R>.json   test accuracy/F1, file sizes, unique codes per layer
 
-How QAT works here (talk-track version)
----------------------------------------
+How QAT works here
+------------------
 Start from the trained FP32 network. BatchNorm is folded into the conv
 weights. Every conv/linear weight goes through a quantizer in the forward
 pass, so the loss "sees" the rounding error. The backward pass uses the

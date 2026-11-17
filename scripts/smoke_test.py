@@ -1,13 +1,13 @@
 """
-5-minute end-to-end check that your install works, BEFORE spending hours on
-real training. Builds a tiny fake dataset (coloured shapes), then runs every
+Quick (~5 min) end-to-end check that the install works, before running the real
+experiment. Builds a tiny fake dataset (coloured shapes), then runs every
 stage of the project on it: baseline training, PTQ + QAT for every level,
 the sweep (fresh-process memory/latency), plots, and the detection pipeline.
 
     python scripts/smoke_test.py
 
 Everything goes into smoke_test_tmp/ and can be deleted afterwards. Accuracy
-numbers here are meaningless; you are only checking nothing crashes.
+numbers here are meaningless; this only checks that nothing crashes.
 """
 
 import shutil

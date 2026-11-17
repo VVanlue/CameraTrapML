@@ -4,6 +4,7 @@
 data/*
 !data/results/
 !data/figures/
+!data/preliminary/
 data/results/cache/
 *.zip
 ena24.json
@@ -29,3 +30,6 @@ smoke_test_tmp/
 # --- OS ---------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+
+# Colab / Google Drive backup folder (duplicates of data/ and models/, plus large files)
+CameraTrapML_outputs/

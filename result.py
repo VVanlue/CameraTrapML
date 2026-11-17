@@ -8,7 +8,7 @@ figure and summary table to data/figures/.
     python result.py --results_dir data/results --out_dir data/figures --resolution 224
 
 All options are those of src/plot_results.py (`python result.py --help`).
-The preliminary (P1) results in data/results/preliminary/ were produced by an
+The preliminary (P1) results in data/preliminary/ were produced by an
 earlier version of the pipeline and are kept as-is for reference.
 """
 

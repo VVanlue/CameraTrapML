@@ -1,0 +1,39 @@
+{
+  "accuracy": 0.0759322033898305,
+  "f1_macro": 0.006415764449790915,
+  "accuracy_std": 0.00694820253117659,
+  "f1_macro_std": 0.0005449399251032212,
+  "accuracy_ci95": [
+    0.06305084745762712,
+    0.08949152542372882
+  ],
+  "f1_macro_ci95": [
+    0.0053919294990723565,
+    0.0074673304293715
+  ],
+  "per_class_f1": {
+    "American_Black_Bear": 0.0,
+    "American_Crow": 0.0,
+    "Bird": 0.0,
+    "Bobcat": 0.0,
+    "Chicken": 0.0,
+    "Coyote": 0.0,
+    "Dog": 0.14114681789540012,
+    "Domestic_Cat": 0.0,
+    "Eastern_Chipmunk": 0.0,
+    "Eastern_Cottontail": 0.0,
+    "Eastern_Fox_Squirrel": 0.0,
+    "Eastern_Gray_Squirrel": 0.0,
+    "Grey_Fox": 0.0,
+    "Horse": 0.0,
+    "Northern_Raccoon": 0.0,
+    "Red_Fox": 0.0,
+    "Striped_Skunk": 0.0,
+    "Vehicle": 0.0,
+    "Virginia_Opossum": 0.0,
+    "White_Tailed_Deer": 0.0,
+    "Wild_Turkey": 0.0,
+    "Woodchuck": 0.0
+  },
+  "n_test": 1475
+}

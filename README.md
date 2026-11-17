@@ -1,161 +1,134 @@
-# CameraTrapML
-## Quantization in Wildlife Camera Traps
-*Measuring memory, latency, and accuracy trade-offs in compressed image classifiers — is quantization worth it?*
+# Quantization in Wildlife Camera Traps
 
-CSCE 585 — Machine Learning Systems (Fall 2025)
+How small can a wildlife species classifier get before it stops being useful?
+CSCE 585 (Machine Learning Systems), Fall 2025.
+
+**Report:** [`docs/report/report.pdf`](docs/report/report.pdf) ·
+**Slides:** [`docs/presentation/`](docs/presentation/) ·
+**Results notebook:** [`notebooks/results_walkthrough.ipynb`](notebooks/results_walkthrough.ipynb) ·
+**Video:** `<add YouTube link>`
 
 ## Group Info
-- Ben Bush — Technical Lead
-  - Email: `<add @email.sc.edu>`
-- Victoria Vanlue — Data Lead
-  - Email: `<add @email.sc.edu>`
+- Ben Bush (Technical Lead), `<email>@email.sc.edu`
+- Victoria Vanlue (Data Lead), `<email>@email.sc.edu`
 
 ## Project Summary/Abstract
-Camera traps produce far more images than people can label, and the models that
-label them often have to run offline on old laptops or small edge devices. We
-fine-tune ImageNet-pretrained MobileNetV2 / ResNet18 classifiers on the ENA24
-camera-trap dataset (22 classes) and quantize them from FP32 down to FP16, INT8,
-INT4, INT3, INT2, ternary (1.58-bit) and binary (1-bit) weights, using both
-post-training quantization (PTQ) and quantization-aware training (QAT). For every
-level we measure accuracy / macro-F1, on-disk size, peak inference RAM, latency
-and throughput across batch sizes, and we ship a detector → classifier demo that
-runs any of the quantized models on real camera-trap photos.
+Camera traps take far more photos than people can label, and the models that label them often have to run
+on small, offline computers in the field. We fine-tuned MobileNetV2 on the ENA24 camera-trap dataset
+(22 species) and shrank it from 32-bit floats down to 8, 4, 3, 2, 1.58 and 1 bits per weight, either by
+rounding after training (PTQ) or by retraining with rounding switched on (QAT). For every version we measured
+accuracy, file size, memory, and speed on a cloud CPU and on a simulated 1-core / 1 GB device.
 
 ## Problem Description
-- **Problem:** find the precision level at which a wildlife species classifier
-  becomes small and fast enough for field hardware without losing the accuracy
-  that makes it useful.
+- **Problem:** find the smallest model that is still accurate enough to label wildlife photos on field hardware.
 - **Motivation**
-  - Manual identification of camera-trap images is slow, costly and error-prone.
-  - Field devices are often offline and memory/CPU-constrained; an FP32 model may not fit or be fast enough.
-  - Quantization is the standard compression tool, but its accuracy cost on small, imbalanced wildlife datasets is not well measured.
+  - Labeling camera-trap photos by hand is slow, costly and needs experts.
+  - Field devices are often offline and short on memory and CPU, so a full-size model may not fit or be fast enough.
+  - Quantization is the standard way to shrink a model, but its cost on a small, imbalanced wildlife dataset is not well measured.
 - **Challenges**
-  - Accuracy collapses below 8 bits without QAT (MobileNetV2's depthwise filters have only 9 weights each).
-  - Mainstream runtimes only have INT8 CPU kernels, so sub-8-bit models need a custom bit-packed storage format and run on INT8 kernels.
-  - Memory and latency measurements are noisy; each config runs in a fresh process with repeats and adaptive trial counts.
+  - Below 8 bits, accuracy collapses unless the model is retrained.
+  - PyTorch only has fast 8-bit integer math, so smaller models need a custom storage format and still run at 8-bit speed.
+  - Speed and memory measurements are noisy, so every configuration runs in a fresh process and is repeated.
 
 ## Contribution
 ### [`Extension of existing work`]
-We use the integer-arithmetic quantization scheme of Jacob et al. (2018) and the
-camera-trap model families of Hussain et al. (2022), and extend them as follows:
-- A systematic sweep from FP32 to 1-bit, PTQ vs. QAT (progressive, with knowledge distillation), across batch size and resolution on ENA24.
-- A real bit-packed n-bit model format (`.qpk`) that reloads into an identical integer model, so storage savings are measured rather than estimated.
-- An end-to-end detector → quantized classifier demo (web app + headless CLI + 1-CPU/1 GB Docker "field device").
+We build on the integer quantization scheme of Jacob et al. (2018) and the edge camera-trap models of
+Hussain et al. (2022), and extend them with:
+- a sweep from 32-bit down to 1-bit, comparing PTQ against QAT (progressive, with knowledge distillation);
+- a bit-packed model format (`.qpk`) that reloads into the identical model, so file sizes are measured, not estimated;
+- a detector → classifier demo app and a 1-CPU / 1 GB "field device" test in Docker.
+
+## Results
+MobileNetV2, 224 px, 1,475 test images. Speed and memory are at batch size 1 on the Colab CPU.
+
+| model | accuracy | file size | ms / image | memory |
+|---|---|---|---|---|
+| 32-bit (fp32) | 89.6% | 9.26 MB | 43.7 | 40 MB |
+| 8-bit QAT | 88.2% | 2.37 MB | 19.3 | 10 MB |
+| 3-bit QAT | 89.4% | 1.04 MB | 19.4 | 10 MB |
+| 1.58-bit QAT | 84.5% | 0.67 MB | 14.4 | 10 MB |
+| 1-bit QAT | 79.8% | 0.51 MB | 19.3 | 10 MB |
+| 8-bit PTQ | 82.1% | 2.37 MB | 19.2 | 10 MB |
+| 3-bit PTQ | 12.4% | 1.04 MB | 19.4 | 10 MB |
+
+![Accuracy vs bits per weight](data/figures/mobilenet_v2/01_accuracy_vs_bits.png)
+
+- **With retraining (QAT), accuracy holds down to 3 bits** while the file shrinks about 9×. Without retraining (PTQ) it collapses below 4 bits.
+- **8-bit is 2.3× faster than 32-bit** (7.6× on the 1-core device) and uses less memory. Going below 8 bits makes the file smaller but not faster.
+- **16-bit is 19× slower than 32-bit on CPU**, because CPUs lack fast 16-bit math.
+
+All 14 models and every figure are in [`data/results/`](data/results/) and [`data/figures/mobilenet_v2/`](data/figures/mobilenet_v2/).
 
 ## References
-BibTeX in [`docs/references.bib`](docs/references.bib). The proposal (P0) is in [`docs/proposal.md`](docs/proposal.md).
+BibTeX in [`docs/references.bib`](docs/references.bib). Our proposal is in [`docs/proposal.md`](docs/proposal.md).
 
 ---
 
 ## Dependencies
-- Python 3.10+ (developed and tested with 3.12)
-- PyTorch ≥ 2.1, torchvision ≥ 0.16 (CPU is enough for inference and the sweep; a GPU is recommended for training/QAT)
-- macOS, Linux or Windows. Quantized engine is chosen automatically (`qnnpack` on ARM/Apple Silicon, `x86`/`fbgemm` on Intel/AMD).
-- Full list: [`pyproject.toml`](pyproject.toml) / [`uv.lock`](uv.lock) (or [`requirements.txt`](requirements.txt) for pip).
+- Python 3.10+ (we used 3.12), PyTorch 2.1+. Tested on macOS (Apple Silicon) and on Linux (Google Colab).
+- A GPU is only needed for training; everything else runs on CPU.
 
 ```bash
-uv sync                                  # creates .venv from uv.lock
-uv sync --extra megadetector             # optional: MegaDetector for the demo
-# pip alternative: python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+uv sync                          # installs from uv.lock (pip users: pip install -r requirements.txt)
+uv sync --extra megadetector     # optional: animal detector for the demo app
+uv sync --extra notebook         # optional: Jupyter, for the results notebook
 ```
 
 ## Directory Structure
 ```
-|- run.py                     # single entry point: demo / smoke / all / individual stages
-|- result.py                  # plots data/results/ -> data/figures/
-|- src/
-|   |- models.py              # MobileNetV2 / ResNet18 construction (float + quantizable)
-|   |- dataset.py             # ENA24 ImageFolder loading, burst-aware grouped splits
-|   |- prepare_ena24.py       # raw LILA ENA24 -> class folders (crops / full frames) + boxes
-|   |- train_baseline.py      # FP32 fine-tuning -> models/
-|   |- quantize.py            # n-bit weight quantizer, int conversion, bit packing
-|   |- train_quantized.py     # PTQ / QAT for int8 ... 1bit -> models/
-|   |- benchmark.py           # fresh-process latency / throughput / memory measurement
-|   |- run_sweep.py           # full experiment -> data/results/
-|   |- plot_results.py        # figures + tables -> data/figures/
-|   |- pipeline.py            # detector -> classifier pipeline (green boxes + species)
-|   |- predict.py             # headless pipeline for folders of photos
-|   |- app.py                 # local Gradio web demo
-|   |- train_detector.py      # optional: our own ENA24 animal detector
-|   |- export_for_backend.py  # re-convert quantized models for ARM (Raspberry Pi)
-|- data/
-|   |- results/               # sweep CSVs + per-model accuracy JSON (tracked)
-|   |   |- preliminary/       # P1 preliminary sweep (earlier pipeline version)
-|   |- figures/               # report figures + summary tables (tracked)
-|   |   |- preliminary/
-|   |- raw/, ena24*/          # dataset (not tracked; see "How to Run")
-|- models/                    # shipped FP32 baseline + metadata; quantized models are generated here
-|- examples/                  # sample ENA24 photos for the demo
-|- notebooks/colab_run.ipynb  # run the full experiment on a Colab GPU
-|- scripts/smoke_test.py      # 5-minute end-to-end check on synthetic data
-|- docs/                      # proposal, references
-|- Dockerfile.constrained     # 1-CPU / 1 GB "field device" emulation
-|- pyproject.toml, uv.lock, requirements.txt
+run.py                  entry point for every step (python run.py --help)
+result.py               makes the figures from data/results/
+src/                    the code: data loading, training, quantization, benchmarking, demo app
+notebooks/
+  colab_run.ipynb       runs the whole experiment on a free Colab GPU (~3 h)
+  results_walkthrough.ipynb   explains every result from the CSVs (runs in seconds)
+data/
+  results/              measurements (CSV) and per-model accuracy (JSON)
+  figures/              charts used in the report and slides
+  preliminary/          our earlier P1 results, kept for reference
+models/                 the trained 32-bit model (quantized models are created here)
+examples/               four camera-trap photos for the demo
+docs/                   report, slides, proposal, references
+scripts/                smoke test and slide builder
+Dockerfile.constrained  1-CPU / 1 GB "field device" test
 ```
 
 ## How to Run
-Every stage is `python run.py <stage> [options]`; `python run.py <stage> --help`
-shows that stage's options.
-
-**0. Check the install (≈5 min, no dataset needed)**
+**Quick check (5 min, no dataset):**
 ```bash
-python run.py smoke     # trains / quantizes / benchmarks / plots on a tiny synthetic dataset
-python run.py demo      # classifies examples/ with the shipped FP32 baseline -> data/predictions/
+python run.py smoke      # runs every step on a tiny fake dataset
+python run.py demo       # labels the photos in examples/ with the trained model
 ```
 
-**1. Download the dataset** — [ENA24-detection on LILA BC](https://lila.science/datasets/ena24detection):
-put the images in `data/raw/images/` and the annotations at `data/raw/ena24.json`.
-
-**2. Run the whole pipeline**
+**Full experiment:** easiest on Colab. Open
+[`notebooks/colab_run.ipynb`](https://colab.research.google.com/github/VVanlue/CameraTrapML/blob/colab/notebooks/colab_run.ipynb),
+choose a GPU runtime and click *Run all*. It downloads the data, runs every step, and gives you a zip to unzip
+into this folder. To run it locally instead, download [ENA24](https://lila.science/datasets/ena24detection)
+into `data/raw/` and run:
 ```bash
 python run.py all --images_dir data/raw/images --annotations data/raw/ena24.json --device cuda
+python result.py
 ```
-This runs, in order (each can also be run alone):
-```bash
-python run.py prepare  --images_dir data/raw/images --annotations data/raw/ena24.json   # -> data/ena24_crops, data/ena24
-python run.py train    --arch mobilenet_v2 --epochs 8                                   # -> models/mobilenet_v2_fp32_res224.pt
-python run.py quantize --arch mobilenet_v2 --method qat --fp32_checkpoint models/mobilenet_v2_fp32_res224.pt
-python run.py quantize --arch mobilenet_v2 --method ptq --fp32_checkpoint models/mobilenet_v2_fp32_res224.pt
-python run.py sweep    --arch mobilenet_v2 --methods qat ptq --batch_sizes 1 4 8 16 --repeats 3
-python result.py                                                                        # -> data/figures/
-```
-Note: `train` overwrites the shipped baseline in `models/` with a newly trained,
-crop-based one (the shipped model was trained on whole frames — see
-`models/mobilenet_v2_res224_meta.json`). Use `--arch resnet18` for the second architecture
-and `--resolutions 128 224 384` (after training at those resolutions) for the resolution study.
+`run.py all` runs `prepare → train → quantize → sweep → plot`; each step can also be run on its own
+(`python run.py <step> --help`).
 
-**On Google Colab instead:** open [`notebooks/colab_run.ipynb`](https://colab.research.google.com/github/VVanlue/CameraTrapML/blob/colab/notebooks/colab_run.ipynb),
-select a GPU runtime and `Run all`. It downloads ENA24, runs every stage, saves progress to Google Drive
-and gives you a zip of `data/results/`, `data/figures/` and `models/` to unzip into the repo.
-
-**3. Constrained "field device" run (optional)**
+**Small-device test:**
 ```bash
 docker build -f Dockerfile.constrained -t cameratrap-edge .
 docker run --rm --cpus=1 --memory=1g -v "$(pwd)/models:/app/models" \
     -v "$(pwd)/data/results:/app/data/results" cameratrap-edge
-python result.py        # adds the device-comparison figure
+python result.py
 ```
+The container times the models on `data/results/cache/timing_res224_n96.pt`, which the sweep creates. We only had
+the Colab results on the laptop, so we used a random batch of the same shape (speed does not depend on the pixel values):
+`python -c "import torch; torch.save(torch.randn(96,3,224,224), 'data/results/cache/timing_res224_n96.pt')"`.
 
-**Reproducibility:** data splits are deterministic (stratified, burst-grouped, seed 42);
-training and QAT use `--seed` (default 0); every benchmark config runs in a fresh process.
-
-## Results
-Preliminary (P1) sweep with an earlier version of the pipeline — MobileNetV2, 224 px,
-PTQ only, sub-8-bit levels simulated (`data/results/preliminary/`):
-
-| level | accuracy | macro-F1 |
-|---|---|---|
-| fp32 | 0.987 | 0.983 |
-| int8 | 0.980 | 0.975 |
-| int4 | 0.167 | 0.090 |
-| int2 | 0.081 | 0.017 |
-| 1bit | 0.034 | 0.003 |
-
-INT8 PTQ is nearly lossless, but PTQ collapses below 8 bits — the motivation for the
-QAT pipeline. The final sweep (`python run.py all ...`) writes the full results and
-figures to `data/results/` and `data/figures/`.
+Data splits, training and quantization are seeded, so reruns give the same split and the same training setup.
 
 ## Demo
-- Video presentation: `<add YouTube link>`
-- Live demo: `python run.py app` opens a local web app; choose any trained model
-  (fp32 … 1bit) from the dropdown and drop in a photo from `examples/`.
+- Video: `<add YouTube link>`
+- `python run.py app` opens a local web app. Pick a model (32-bit … 1-bit), drop in a photo from `examples/`,
+  and it draws a box around each animal with the species name.
+- The box comes from [MegaDetector](https://github.com/microsoft/CameraTraps), an off-the-shelf animal
+  detector used only for the demo; none of our measurements depend on it. Our model was trained on cropped
+  animals, so without the detector installed the app classifies the whole photo and does much worse.

@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir torch torchvision --index-url https://download.py
 COPY src/ src/
 # Accuracy was already measured on the laptop, so skip it and time on 1 thread.
 CMD ["python", "src/run_sweep.py", "--arch", "mobilenet_v2", "--tag", "docker_1cpu_1gb", \
-     "--threads", "1", "--skip_accuracy", "--batch_sizes", "1", "4", "8", "--repeats", "3"]
+     "--threads", "1", "--skip_accuracy", "--batch_sizes", "1", "8", "--repeats", "3"]
